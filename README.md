@@ -8,7 +8,7 @@
 ## Prérequis
 
 - Compte Onyxia avec un service `vscode-pyspark` (4 CPU, 4 Go RAM) et son bucket S3 personnel
-- Outils fournis par l'image : `aws` CLI, `kubectl`, `uv`, `pyspark` (Spark 4.1), `duckdb`
+- Outils fournis par l'image : `aws` CLI, `kubectl`, `uv`, `pyspark` (Spark 4.3), `duckdb`
 - Accès réseau à Maven Central (téléchargement d'Iceberg au démarrage de Spark) et à la source du dataset
 
 ## Dataset
@@ -37,8 +37,9 @@ cd bigdata_project && source src/setup/onyxia_init.sh
 # 2. Ingestion : télécharger les données brutes et les déposer sur S3 (bronze)
 bash src/ingestion/download_bronze.sh
 
-# 3. Traitement : bronze -> silver -> gold
-#    _à compléter_
+# 3. Traitement : bronze -> silver (Parquet par année + rapport qualité dans silver/_qualite/)
+python -u src/processing/bronze_to_silver.py 2>&1 | grep -v WARN | tee ~/work/silver_run.log
+#    silver -> gold : _à compléter_
 
 # 4. Vérification indépendante d'un résultat
 #    _à compléter_
