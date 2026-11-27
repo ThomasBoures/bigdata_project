@@ -15,6 +15,8 @@ ICEBERG_PACKAGE = "org.apache.iceberg:iceberg-spark-runtime-4.1_2.13:1.11.0"
 
 BUCKET = os.environ.get("BUCKET") or os.environ["KUBERNETES_NAMESPACE"]
 S3_PREFIX = os.environ.get("S3_PREFIX", "project")
+JVM_OPTS = ("-XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:MaxMetaspaceSize=320m "
+            "-XX:ReservedCodeCacheSize=96m -XX:MaxDirectMemorySize=128m -Xss512k")
 
 
 def s3_path(layer: str, *parts: str) -> str:
@@ -38,7 +40,10 @@ def get_spark(app_name: str = "bigdata-project", iceberg: bool = True) -> SparkS
         SparkSession.builder.appName(app_name)
         .master(os.environ.get("SPARK_MASTER", f"local[{cores}]"))
         # Pod vscode-pyspark limité (2 cœurs / 2 Go partagés avec l'IDE) : JVM et parallélisme bornés.
-        .config("spark.driver.memory", os.environ.get("SPARK_DRIVER_MEMORY", "768m"))
+        .config("spark.driver.memory", os.environ.get("SPARK_DRIVER_MEMORY", "512m"))
+        # La JVM consomme bien plus que son heap (métaspace, code compilé, buffers S3A) : ~950 Mo de RSS
+        # mesurés pour 512m de heap. On plafonne ces zones hors heap pour rester sous la limite du pod.
+        .config("spark.driver.extraJavaOptions", os.environ.get("SPARK_DRIVER_JAVA_OPTS", JVM_OPTS))
         .config("spark.sql.shuffle.partitions", os.environ.get("SPARK_SHUFFLE_PARTITIONS", str(cores * 2)))
         .config("spark.ui.enabled", "false")
         .config("spark.hadoop.fs.s3a.endpoint", f"https://{os.environ['AWS_S3_ENDPOINT']}")
