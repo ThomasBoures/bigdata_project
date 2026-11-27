@@ -26,9 +26,22 @@ else
   echo "Accès S3           : ÉCHEC -> copier le script 'S3 profile' du portail Onyxia, ou redémarrer le service" >&2
 fi
 
+# --- Réglages personnels hors dépôt (facultatif) --------------------------------------
+[ -f /home/onyxia/work/.onyxia_local.sh ] && bash /home/onyxia/work/.onyxia_local.sh
+
 # --- Git -----------------------------------------------------------------------------
 git config --global init.defaultBranch main
 git config --global pull.rebase true
+# git push sans ressaisie : utilise le token de "Mon compte > Git" (Onyxia l'injecte dans GIT_PERSONAL_ACCESS_TOKEN).
+# Le helper lit la variable au moment du push : le token n'est jamais écrit sur disque.
+if [ -n "${GIT_PERSONAL_ACCESS_TOKEN:-}" ]; then
+  git config --global --unset-all credential.https://github.com.helper 2>/dev/null
+  git config --global --add credential.https://github.com.helper ''
+  git config --global --add credential.https://github.com.helper \
+    '!f() { test "$1" = get && echo username=x-access-token && echo "password=$GIT_PERSONAL_ACCESS_TOKEN"; }; f'
+else
+  echo "Token Git absent : le renseigner dans Mon compte > Git du portail Onyxia (portée repo)" >&2
+fi
 echo "Git                : $(git config user.name) <$(git config user.email)> sur $(git branch --show-current 2>/dev/null)"
 git fetch --quiet 2>/dev/null && git status -sb | head -n 1
 echo "Rappel : commit + push avant de supprimer le service."

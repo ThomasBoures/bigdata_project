@@ -17,9 +17,10 @@ git config user.email "<id>+<pseudo>@users.noreply.github.com"   # adresse norep
 source src/setup/onyxia_init.sh
 ```
 
-Authentification pour `git push` : accepter la popup de l'extension GitHub de VS Code, ou utiliser un
-Personal Access Token (github.com/settings/tokens, portée `repo`) comme mot de passe. Le binôme doit être ajouté en
-collaborateur : *Settings → Collaborators* du dépôt.
+Authentification pour `git push` : renseigner une fois un token GitHub (fine-grained, accès *Contents: Read and write*
+sur ce dépôt) dans *Mon compte → Git* du portail Onyxia. Il est injecté dans chaque nouveau service
+(`GIT_PERSONAL_ACCESS_TOKEN`) et `onyxia_init.sh` configure git pour l'utiliser, sans l'écrire sur disque.
+Le binôme doit être ajouté en collaborateur : *Settings → Collaborators* du dépôt.
 
 ## 3. Avant de fermer / supprimer le service
 
