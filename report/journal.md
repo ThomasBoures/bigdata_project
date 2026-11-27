@@ -51,4 +51,4 @@ Mesures faites hors Spark (Python `csv`, 2026-11-27) : à recompter en Spark sur
 
 | Fichier | Contenu | Composant | Date |
 |---------|---------|-----------|------|
-| 01_...  |         |           |      |
+| 01_bronze_s3.png | Ingestion : téléchargement, contrôle taille, dépôt et listing bronze (namespace + heure) | S3 (aws CLI) | 2026-11-27 10:32 |
