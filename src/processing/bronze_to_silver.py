@@ -142,40 +142,54 @@ def clean(raw: DataFrame) -> DataFrame:
 
 
 def quality_report(spark, raw: DataFrame, silver: DataFrame) -> DataFrame:
-    """Nombre de lignes touchées par chaque règle, calculé sur les données brutes typées."""
+    """Nombre de lignes touchées par chaque règle, calculé sur les données brutes typées.
+
+    Toutes les règles ligne à ligne sont évaluées en UNE seule agrégation (un seul passage sur les données) :
+    une requête Spark par règle (16 jobs) faisait déborder la mémoire du pod (2 Go partagés avec l'IDE)."""
     r = raw.where(F.col("_corrupt_record").isNull())
     neg_counts = " OR ".join(f"{c} < 0" for c in COUNTS)
     causes_sum = " + ".join(CAUSES)
-    key = ["date", "service", "gare_depart", "gare_arrivee"]
-    rules = [
-        ("Ligne illisible (CSV corrompu)", raw.where(F.col("_corrupt_record").isNotNull()).count(), "ligne écartée"),
-        ("Clé (date, gare_depart, gare_arrivee) en double, services National et International distincts",
-         r.groupBy("date", "gare_depart", "gare_arrivee").count().where("count > 1").count() * 2,
-         "conservées : la clé réelle inclut service"),
-        ("Clé (date, service, gare_depart, gare_arrivee) en double",
-         r.groupBy(*key).count().where("count > 1").count(), "aucune"),
+    # (libellé, condition SQL évaluée sur chaque ligne brute, traitement appliqué)
+    row_rules = [
         ("Commentaires multi-lignes (lecture multiLine nécessaire)",
-         r.where(F.col("commentaires_retard_arrivee").contains("\n")).count(), "multiLine=true, escape='\"'"),
-        ("Comptage négatif", r.where(neg_counts).count(), "valeur -> NULL"),
+         "instr(commentaires_retard_arrivee, char(10)) > 0", "multiLine=true, escape='\"'"),
+        ("Comptage négatif", neg_counts, "valeur -> NULL"),
         ("Retard moyen « tous trains » négatif (avance)",
-         r.where("retard_moyen_tous_trains_depart < 0 OR retard_moyen_tous_trains_arrivee < 0").count(), "conservé"),
+         "retard_moyen_tous_trains_depart < 0 OR retard_moyen_tous_trains_arrivee < 0", "conservé"),
         ("Retard moyen des trains en retard négatif",
-         r.where("retard_moyen_depart < 0 OR retard_moyen_arrivee < 0 OR retard_moyen_trains_retard_sup15 < 0").count(),
-         "valeur -> NULL"),
+         "retard_moyen_depart < 0 OR retard_moyen_arrivee < 0 OR retard_moyen_trains_retard_sup15 < 0", "valeur -> NULL"),
         ("retard_moyen_trains_retard_sup15 = retard_moyen_tous_trains_arrivee (colonne recopiée)",
-         r.where("retard_moyen_trains_retard_sup15 = retard_moyen_tous_trains_arrivee").count(), "valeur -> NULL"),
-        ("Aucun train prévu (nb_train_prevu = 0)", r.where("nb_train_prevu = 0").count(), "comptages_valides = false"),
-        ("Annulations > trains prévus", r.where("nb_annulation > nb_train_prevu").count(), "comptages_valides = false"),
+         "retard_moyen_trains_retard_sup15 = retard_moyen_tous_trains_arrivee", "valeur -> NULL"),
+        ("Aucun train prévu (nb_train_prevu = 0)", "nb_train_prevu = 0", "comptages_valides = false"),
+        ("Annulations > trains prévus", "nb_annulation > nb_train_prevu", "comptages_valides = false"),
         ("Retards > 15 min > trains en retard à l'arrivée",
-         r.where("nb_train_retard_sup_15 > nb_train_retard_arrivee").count(), "comptages_valides = false"),
-        ("Retards > 60 min > retards > 30 min", r.where("nb_train_retard_sup_60 > nb_train_retard_sup_30").count(),
-         "signalé, non utilisé"),
-        ("Somme des 6 causes hors [99 ; 101] %", r.where(f"NOT ({causes_sum}) BETWEEN 99 AND 101").count(),
-         "causes_valides = false"),
+         "nb_train_retard_sup_15 > nb_train_retard_arrivee", "comptages_valides = false"),
+        ("Retards > 60 min > retards > 30 min", "nb_train_retard_sup_60 > nb_train_retard_sup_30", "signalé, non utilisé"),
+        ("Somme des 6 causes hors [99 ; 101] %", f"NOT ({causes_sum}) BETWEEN 99 AND 101", "causes_valides = false"),
         ("Colonnes de commentaires toujours vides (commentaire_annulation, commentaire_retards_depart)",
-         r.where("commentaire_annulation IS NULL AND commentaire_retards_depart IS NULL").count(), "colonnes supprimées"),
-        ("Lignes silver exploitables pour le taux > 15 min", silver.where("comptages_valides").count(), "-"),
-        ("Lignes silver exploitables pour les causes", silver.where("comptages_valides AND causes_valides").count(), "-"),
+         "commentaire_annulation IS NULL AND commentaire_retards_depart IS NULL", "colonnes supprimées"),
+    ]
+    agg = raw.agg(
+        F.sum(F.col("_corrupt_record").isNotNull().cast("long")).alias("corrupt"),
+        *[F.sum(F.coalesce(F.expr(cond), F.lit(False)).cast("long")
+                * F.col("_corrupt_record").isNull().cast("long")).alias(f"r{i}")
+          for i, (_, cond, _) in enumerate(row_rules)],
+    ).first()
+    dup3 = r.groupBy("date", "gare_depart", "gare_arrivee").count().where("count > 1").count()
+    dup4 = r.groupBy("date", "service", "gare_depart", "gare_arrivee").count().where("count > 1").count()
+    ok = silver.agg(
+        F.sum(F.col("comptages_valides").cast("long")).alias("taux"),
+        F.sum((F.col("comptages_valides") & F.col("causes_valides")).cast("long")).alias("causes"),
+    ).first()
+
+    rules = [
+        ("Ligne illisible (CSV corrompu)", agg["corrupt"] or 0, "ligne écartée"),
+        ("Clé (date, gare_depart, gare_arrivee) en double, services National et International distincts",
+         dup3 * 2, "conservées : la clé réelle inclut service"),
+        ("Clé (date, service, gare_depart, gare_arrivee) en double", dup4, "aucune"),
+        *[(label, agg[f"r{i}"] or 0, treatment) for i, (label, _, treatment) in enumerate(row_rules)],
+        ("Lignes silver exploitables pour le taux > 15 min", ok["taux"] or 0, "-"),
+        ("Lignes silver exploitables pour les causes", ok["causes"] or 0, "-"),
     ]
     return spark.createDataFrame(rules, "regle string, lignes_touchees long, traitement string")
 
@@ -207,6 +221,8 @@ def main() -> None:
     report = quality_report(spark, raw, silver)
     report.coalesce(1).write.mode("overwrite").option("header", True).csv(s3_path("silver", "_qualite", "regularite_tgv"))
     report.show(truncate=False)
+    raw.unpersist()
+    silver.unpersist()
 
     # Relecture de contrôle depuis S3.
     back = spark.read.parquet(dest)
