@@ -1,0 +1,43 @@
+# Données : elles vivent sur S3, jamais dans Git
+data/
+*.csv
+*.tsv
+*.json
+!.vscode/*.json
+*.jsonl
+*.parquet
+*.avro
+*.orc
+*.xlsx
+*.zip
+*.gz
+*.tgz
+
+# Secrets et identifiants
+.env
+.env.*
+*.env
+s3.env
+credentials*
+*.pem
+*.key
+.aws/
+
+# Python / uv
+__pycache__/
+*.py[cod]
+.venv/
+.ipynb_checkpoints/
+.pytest_cache/
+
+# Spark / DuckDB locaux
+spark-warehouse/
+metastore_db/
+derby.log
+*.duckdb
+*.duckdb.wal
+
+# Divers
+.DS_Store
+Thumbs.db
+*.log

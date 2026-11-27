@@ -1,0 +1,45 @@
+# Job Kubernetes qui dépose les fichiers bruts dans s3://$BUCKET/project/bronze/ (ingestion dans le cluster).
+# Prérequis (voir src/ingestion/README.md pour les commandes exactes) :
+#   - ConfigMap "raw-data"   : les fichiers bruts (limite 1 MiB par ConfigMap)
+#   - ConfigMap "s3-config"  : AWS_ENDPOINT_URL, AWS_DEFAULT_REGION, BUCKET
+#   - Secret    "s3-credentials" : AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN
+# Lancement : kubectl apply -f k8s/job-upload-bronze.yaml && kubectl wait --for=condition=complete job/upload-bronze --timeout=120s
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: upload-bronze
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: upload
+          image: amazon/aws-cli:latest
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              date '+%Y-%m-%d %H:%M:%S %Z'
+              aws s3 cp /data/ "s3://$BUCKET/project/bronze/" --recursive
+              aws s3 ls "s3://$BUCKET/project/bronze/" --recursive --human-readable --summarize
+          envFrom:
+            - configMapRef:
+                name: s3-config
+            - secretRef:
+                name: s3-credentials
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: raw-data
+              mountPath: /data
+              readOnly: true
+      volumes:
+        - name: raw-data
+          configMap:
+            name: raw-data
