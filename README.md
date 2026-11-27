@@ -1,4 +1,4 @@
-# Framework Big Data — <titre du projet>
+# Framework Big Data — Ponctualité des TGV par liaison (2018–2026)
 
 ## Auteurs
 
@@ -15,11 +15,11 @@
 
 | Nom | URL | Licence | Date de téléchargement | Taille brute |
 |-----|-----|---------|------------------------|--------------|
-| _à compléter_ | _à compléter_ | _à compléter_ | _AAAA-MM-JJ_ | _x,x Mo (entre 1 et 5 Mo)_ |
+| SNCF Voyageurs — Régularité mensuelle TGV par liaisons (`regularite-mensuelle-tgv-aqst`), 12 907 lignes, 2018-01 → 2026-09 | https://ressources.data.sncf.com/explore/dataset/regularite-mensuelle-tgv-aqst/ | ODbL | 2026-11-27 | 2,9 Mo (CSV `;`) |
 
 ## Problématique
 
-_À compléter en 3 phrases maximum : la question posée, pourquoi, et le résultat vérifiable attendu._
+Entre 2018-2019 et 2024-2025, quelles liaisons TGV ont le plus dégradé leur taux de trains arrivés avec plus de 15 minutes de retard ? Pour ces liaisons, quelle catégorie de cause (externe, infrastructure, gestion du trafic, matériel roulant, gare, voyageurs) pèse le plus dans les retards ? Le résultat est une table gold par liaison (taux par période, écart, cause dominante), recalculée indépendamment avec DuckDB.
 
 ## Chemins S3
 
@@ -35,7 +35,7 @@ cd /home/onyxia/work && git clone https://github.com/ThomasBoures/bigdata_projec
 cd bigdata_project && source src/setup/onyxia_init.sh
 
 # 2. Ingestion : télécharger les données brutes et les déposer sur S3 (bronze)
-#    _à compléter_
+bash src/ingestion/download_bronze.sh
 
 # 3. Traitement : bronze -> silver -> gold
 #    _à compléter_
