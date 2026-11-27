@@ -25,5 +25,5 @@ collaborateur : *Settings → Collaborators* du dépôt.
 
 ```bash
 git add -A && git commit -m "..." && git push
-aws s3 --profile default ls "s3://$BUCKET/project/" --recursive   # les données sont bien sur S3
+aws s3 ls "s3://$BUCKET/project/" --recursive   # les données sont bien sur S3
 ```

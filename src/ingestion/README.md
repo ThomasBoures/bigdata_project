@@ -10,8 +10,8 @@ mkdir -p data/raw && cd data/raw
 # curl -fsSLO <URL du dataset>        # à compléter une fois le dataset choisi
 du -ch . | tail -n 1                   # doit être entre 1 Mo et 5 Mo
 cd ../..
-aws s3 --profile default cp data/raw/ "s3://$BUCKET/$S3_PREFIX/bronze/" --recursive
-aws s3 --profile default ls "s3://$BUCKET/$S3_PREFIX/bronze/" --recursive --human-readable --summarize
+aws s3 cp data/raw/ "s3://$BUCKET/$S3_PREFIX/bronze/" --recursive
+aws s3 ls "s3://$BUCKET/$S3_PREFIX/bronze/" --recursive --human-readable --summarize
 ```
 
 ## B. Depuis un Job Kubernetes (`k8s/job-upload-bronze.yaml`)
@@ -21,9 +21,9 @@ kubectl auth can-i create jobs   # doit répondre yes
 kubectl create configmap raw-data --from-file=data/raw/            # max 1 MiB par ConfigMap
 kubectl create configmap s3-config \
   --from-literal=AWS_ENDPOINT_URL="$S3_ENDPOINT_URL" \
-  --from-literal=AWS_DEFAULT_REGION="$(aws configure get region --profile default)" \
+  --from-literal=AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}" \
   --from-literal=BUCKET="$BUCKET"
-aws configure export-credentials --profile default --format env-no-export \
+aws configure export-credentials --format env-no-export \
   | grep -E '^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)=' > s3.env
 kubectl create secret generic s3-credentials --from-env-file=s3.env && rm s3.env
 
