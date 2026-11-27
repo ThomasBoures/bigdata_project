@@ -22,10 +22,25 @@ def s3_path(layer: str, *parts: str) -> str:
     return "/".join([f"s3a://{BUCKET}", S3_PREFIX, layer, *parts])
 
 
+def container_cores(default: int = 2) -> int:
+    """Cœurs réellement alloués au pod (quota cgroup v2). os.cpu_count() renvoie ceux du nœud (24) :
+    local[*] lancerait alors 24 tâches en parallèle et dépasserait la limite mémoire du pod (OOM)."""
+    try:
+        quota, period = open("/sys/fs/cgroup/cpu.max").read().split()
+        return max(1, int(quota) // int(period)) if quota != "max" else os.cpu_count() or default
+    except (OSError, ValueError):
+        return default
+
+
 def get_spark(app_name: str = "bigdata-project", iceberg: bool = True) -> SparkSession:
+    cores = container_cores()
     builder = (
         SparkSession.builder.appName(app_name)
-        .master(os.environ.get("SPARK_MASTER", "local[*]"))
+        .master(os.environ.get("SPARK_MASTER", f"local[{cores}]"))
+        # Pod vscode-pyspark limité (2 cœurs / 2 Go partagés avec l'IDE) : JVM et parallélisme bornés.
+        .config("spark.driver.memory", os.environ.get("SPARK_DRIVER_MEMORY", "768m"))
+        .config("spark.sql.shuffle.partitions", os.environ.get("SPARK_SHUFFLE_PARTITIONS", str(cores * 2)))
+        .config("spark.ui.enabled", "false")
         .config("spark.hadoop.fs.s3a.endpoint", f"https://{os.environ['AWS_S3_ENDPOINT']}")
         .config("spark.hadoop.fs.s3a.access.key", os.environ["AWS_ACCESS_KEY_ID"])
         .config("spark.hadoop.fs.s3a.secret.key", os.environ["AWS_SECRET_ACCESS_KEY"])

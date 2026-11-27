@@ -184,7 +184,9 @@ def main() -> None:
     t0 = time.perf_counter()
     spark = get_spark("bronze-to-silver", iceberg=False)
     now = datetime.now(ZoneInfo("Europe/Paris")).strftime("%Y-%m-%d %H:%M:%S %Z")
-    print(f"[{now}] namespace={BUCKET} spark={spark.version}")
+    conf = spark.sparkContext.getConf()
+    print(f"[{now}] namespace={BUCKET} spark={spark.version} master={conf.get('spark.master')} "
+          f"driver.memory={conf.get('spark.driver.memory')}", flush=True)
 
     src = latest_bronze_file(spark)
     raw = read_bronze(spark, src).cache()
@@ -197,7 +199,8 @@ def main() -> None:
     silver = clean(raw).cache()
     n_silver = silver.count()
     dest = s3_path("silver", "regularite_tgv")
-    silver.write.mode("overwrite").partitionBy("annee").parquet(dest)
+    # Un fichier par année (9 petits fichiers) plutôt qu'un fichier par tâche et par année.
+    silver.repartition("annee").write.mode("overwrite").partitionBy("annee").parquet(dest)
     t_write = time.perf_counter()
     print(f"Écriture silver : {dest} -> {n_silver} lignes ({t_write - t_read:.1f} s)")
 
