@@ -72,5 +72,5 @@ causes (sur 12 907). Lignes valides par année : 2018 1 554/1 560, 2019 1 469/1 
 | Fichier | Contenu | Composant | Date |
 |---------|---------|-----------|------|
 | 01_bronze_s3.png | Ingestion : téléchargement, contrôle taille, dépôt et listing bronze (namespace + heure) | S3 (aws CLI) | 2026-11-27 10:32 |
-| 02_silver_s3.png | Listing silver : 9 Parquet par année + rapport qualité (namespace + heure) | S3 | à faire |
-| 03_spark_silver_run.png | Trace du job Spark bronze → silver (en-tête namespace/heure, rapport qualité, durée) | Spark | à faire |
+| 02_silver_s3.png | Listing silver : 9 Parquet par année + rapport qualité, 12 objets, 1,1 MiB (namespace + heure) | S3 (aws CLI) | 2026-11-27 13:35 |
+| 03_spark_silver_run.png | Trace du job Spark bronze → silver du 13:17 (namespace, Spark 4.3.0, rapport qualité, lignes valides par année, 62,2 s), affichée à 13:35 | Spark | 2026-11-27 13:35 |
